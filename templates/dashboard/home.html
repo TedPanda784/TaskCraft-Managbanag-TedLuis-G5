@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | CampusConnect{% endblock %}
+
+{% block content %}
+<header class="welcome-card">
+    <p class="eyebrow">YOUR CAMPUS, CONNECTED</p>
+    <h1>Welcome, {{ user.first_name|default:user.username }} <span aria-hidden="true">✦</span></h1>
+    <p class="muted">Here’s your CampusConnect at a glance.</p>
+</header>
+<section class="profile-grid" aria-label="Your account summary">
+    <article class="content-card profile-card">
+        <p class="eyebrow">YOUR PROFILE</p>
+        <h2>{{ user.get_role_display }}</h2>
+        <p><span class="detail-label">Course</span>{{ user.course|default:"Not set" }}</p>
+        <p><span class="detail-label">Last login</span>{{ user.last_login|date:"M d, Y"|default:"First visit" }}</p>
+    </article>
+    <article class="stat-card stat-card-blue member-highlight">
+        <span class="stat-icon" aria-hidden="true">✧</span>
+        <p class="stat-label">CampusConnect community</p>
+        <p class="stat-value">{{ member_count }}</p>
+        <p class="stat-note">registered members</p>
+    </article>
+</section>
+{% if user.is_superuser or user.role == "ADMIN" %}
+<a class="button" href="{% url 'admin_panel' %}">Go to Admin Panel <span aria-hidden="true">→</span></a>
+{% endif %}
+{% endblock %}

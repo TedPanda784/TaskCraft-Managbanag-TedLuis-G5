@@ -447,6 +447,37 @@ h2 {
     font-weight: 700;
 }
 
+.messages {
+    width: min(720px, 100%);
+    margin: 0 auto 1rem;
+}
+
+.message {
+    padding: 0.8rem 1rem;
+    border: 1px solid rgba(131, 185, 255, 0.35);
+    border-radius: 0.7rem;
+    color: var(--white);
+    background: rgba(52, 94, 171, 0.3);
+}
+
+.profile-summary {
+    margin-top: 1.25rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--panel-border);
+    border-radius: 0.75rem;
+    background: rgba(9, 12, 31, 0.35);
+}
+
+.profile-summary p {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.35rem;
+}
+
+.profile-summary p:last-child {
+    margin-bottom: 0;
+}
+
 @media (max-width: 700px) {
     .site-nav {
         align-items: flex-start;

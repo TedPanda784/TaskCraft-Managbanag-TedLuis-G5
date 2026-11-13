@@ -9,7 +9,9 @@
         <h1>Admin Panel</h1>
         <p class="muted">A clear view of your CampusConnect community.</p>
     </div>
+    {% if user.is_staff %}
     <a class="button button-outline" href="{% url 'admin:index' %}">Django admin <span aria-hidden="true">↗</span></a>
+    {% endif %}
 </header>
 
 <section class="stat-grid" aria-label="Membership summary">

@@ -122,30 +122,11 @@ class AccountFlowTests(TestCase):
                 f"{reverse('login')}?next={url}",
             )
 
-    def test_student_cannot_open_admin_dashboard(self):
+    def test_dashboard_uses_taskcraft_branding(self):
         self.client.force_login(self.student)
-
-        response = self.client.get(reverse("admin_panel"))
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_admin_gets_admin_dashboard_after_login_and_student_gets_student_dashboard(self):
-        self.client.force_login(self.student)
-        student_dashboard = self.client.get(reverse("dashboard"))
-        self.assertContains(student_dashboard, "YOUR CAMPUS, CONNECTED")
-        self.assertNotContains(student_dashboard, "Recently joined")
-
-        admin = User.objects.create_user(
-            username="campusadmin",
-            email="admin@example.com",
-            password="A-very-strong-Password-938!",
-            role=CustomUser.Role.ADMIN,
-        )
-        self.client.force_login(admin)
-        admin_dashboard = self.client.get(reverse("dashboard"))
-
-        self.assertContains(admin_dashboard, "Admin Panel")
-        self.assertContains(admin_dashboard, "Recently joined")
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, "TaskCraft")
+        self.assertContains(response, "game-loop tasks")
 
     def test_profile_update_changes_only_the_signed_in_user(self):
         other_user = User.objects.create_user(
@@ -161,8 +142,6 @@ class AccountFlowTests(TestCase):
                 "first_name": "Updated",
                 "last_name": "Name",
                 "email": "UPDATED@example.com",
-                "course": "Design",
-                "phone_number": "555-0199",
             },
         )
 
@@ -171,8 +150,6 @@ class AccountFlowTests(TestCase):
         other_user.refresh_from_db()
         self.assertEqual(self.student.first_name, "Updated")
         self.assertEqual(self.student.email, "updated@example.com")
-        self.assertEqual(self.student.course, "Design")
-        self.assertEqual(self.student.phone_number, "555-0199")
         self.assertEqual(other_user.email, "other@example.com")
 
     def test_profile_rejects_another_users_email(self):

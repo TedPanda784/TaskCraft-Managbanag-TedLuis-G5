@@ -15,8 +15,6 @@ class CustomUserCreationForm(UserCreationForm):
             "email",
             "first_name",
             "last_name",
-            "course",
-            "phone_number",
         )
 
     def clean_email(self):
@@ -31,7 +29,7 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = CustomUser
-        fields = ("first_name", "last_name", "email", "course", "phone_number")
+        fields = ("first_name", "last_name", "email")
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -42,7 +40,7 @@ class ProfileForm(forms.ModelForm):
         return email
 
 
-class CampusConnectAuthenticationForm(AuthenticationForm):
+class TaskCraftAuthenticationForm(AuthenticationForm):
     error_messages = {
         **AuthenticationForm.error_messages,
         "invalid_login": _("Invalid username or password."),

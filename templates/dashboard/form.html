@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} | TaskCraft{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <p class="eyebrow">TASKCRAFT WORKSPACE</p>
+    <h1>{{ page_title }}</h1>
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="action-row">
+            <button class="button" type="submit">Save changes</button>
+            {% if object.project_id %}
+            <a class="button button-outline" href="{% url 'project_detail' object.project_id %}">Cancel</a>
+            {% elif object.project %}
+            <a class="button button-outline" href="{% url 'project_detail' object.project.pk %}">Cancel</a>
+            {% else %}
+            <a class="button button-outline" href="{% url 'dashboard' %}">Cancel</a>
+            {% endif %}
+        </div>
+    </form>
+</section>
+{% endblock %}

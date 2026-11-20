@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Sign up | CampusConnect{% endblock %}
+{% block title %}Sign up | TaskCraft{% endblock %}
 
 {% block content %}
 <section class="auth-card">
-  <p class="eyebrow">JOIN YOUR CAMPUS</p>
+  <p class="eyebrow">START BUILDING</p>
   <h1>Create your account</h1>
-  <p class="muted">Find your people and get connected.</p>
+  <p class="muted">Set up a focused workspace for your game projects.</p>
   <form method="post" class="auth-form">
     {% csrf_token %}
     {{ form.as_p }}
     <button class="button" type="submit">Create account <span aria-hidden="true">→</span></button>
   </form>
-  <p class="auth-footer">Already a member? <a href="{% url 'login' %}">Log in</a></p>
+  <p class="auth-footer">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
 </section>
 {% endblock %}

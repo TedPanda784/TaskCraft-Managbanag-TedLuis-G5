@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} | TaskCraft{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+    <div>
+        <p class="eyebrow"><a href="{% url 'dashboard' %}">PROJECTS</a> / SPRINT BOARD</p>
+        <h1>{{ project.name }}</h1>
+        <p class="muted">{{ project.description|default:"Plan the next build, track your work, and capture bugs." }}</p>
+        <span class="status-pill">{{ project.get_status_display }}</span>
+    </div>
+    <div class="action-row">
+        <a class="button button-outline" href="{% url 'project_report' project.pk %}">Progress report</a>
+        <a class="button button-outline" href="{% url 'project_update' project.pk %}">Edit project</a>
+        <a class="button button-outline" href="{% url 'project_delete' project.pk %}">Delete</a>
+    </div>
+</header>
+
+<section class="content-card board-tools" aria-label="Task filters">
+    <form method="get" class="filter-form">
+        <label>Search tasks
+            <input type="search" name="q" value="{{ search }}" placeholder="Task title or details">
+        </label>
+        <label>Logic track
+            <select name="track">
+                <option value="">All tracks</option>
+                {% for track in tracks %}
+                <option value="{{ track.slug }}" {% if selected_track == track.slug %}selected{% endif %}>{{ track.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Status
+            <select name="status">
+                <option value="">Any status</option>
+                {% for value, label in task_statuses %}
+                <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="button button-outline" type="submit">Filter</button>
+        <a class="text-link" href="{% url 'project_detail' project.pk %}">Clear</a>
+    </form>
+</section>
+
+<div class="board-heading">
+    <div>
+        <p class="eyebrow">SPRINT BOARD</p>
+        <h2>Logic tracks</h2>
+    </div>
+    <a class="button" href="{% url 'task_create' %}?project={{ project.pk }}">Add task</a>
+</div>
+<section class="board-grid" aria-label="Tasks by logic track">
+    {% for section in track_sections %}
+    <article class="track-column">
+        <header class="track-heading">
+            <h3>{{ section.track.name }}</h3>
+            <span class="member-count">{{ section.tasks|length }}</span>
+        </header>
+        {% for task in section.tasks %}
+        <div class="task-card">
+            <div class="task-card-heading">
+                <h4>{{ task.title }}</h4>
+                <span class="status-pill status-{{ task.status|lower }}">{{ task.get_status_display }}</span>
+            </div>
+            {% if task.description %}<p class="muted">{{ task.description|truncatewords:24 }}</p>{% endif %}
+            {% if task.milestone %}<p class="task-meta">Milestone: {{ task.milestone.name }}</p>{% endif %}
+            {% if task.due_date %}<p class="task-meta">Due {{ task.due_date|date:"M j, Y" }}</p>{% endif %}
+            {% if section.track.slug == "active-bugs" %}
+                {% if task.bug_detail %}
+                <div class="bug-summary">
+                    <span class="priority-pill priority-{{ task.bug_detail.priority|lower }}">{{ task.bug_detail.get_priority_display }} priority</span>
+                    <pre>{{ task.bug_detail.error_log|truncatechars:180 }}</pre>
+                    <details>
+                        <summary>Reproduction steps ({{ task.bug_detail.reproduction_steps.count }})</summary>
+                        <ol>
+                            {% for step in task.bug_detail.reproduction_steps.all %}
+                            <li>{{ step.instruction }}</li>
+                            {% endfor %}
+                        </ol>
+                    </details>
+                    <a class="text-link" href="{% url 'bug_update' task.bug_detail.pk %}">Edit bug details</a>
+                    <a class="text-link" href="{% url 'bug_delete' task.bug_detail.pk %}">Delete bug details</a>
+                </div>
+                {% else %}
+                <a class="text-link" href="{% url 'bug_create' task.pk %}">Add error log and reproduction steps</a>
+                {% endif %}
+            {% endif %}
+            <div class="task-actions">
+                <a href="{% url 'task_update' task.pk %}">Edit task</a>
+                <a href="{% url 'task_delete' task.pk %}">Delete task</a>
+            </div>
+        </div>
+        {% empty %}
+        <p class="empty-state">No matching tasks in this track.</p>
+        {% endfor %}
+    </article>
+    {% endfor %}
+</section>
+
+<section class="content-card milestone-section" aria-labelledby="milestones-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">PROJECT CHECKPOINTS</p>
+            <h2 id="milestones-heading">Milestones</h2>
+        </div>
+        <a class="button button-outline" href="{% url 'milestone_create' %}?project={{ project.pk }}">Add milestone</a>
+    </div>
+    {% if milestones %}
+    <div class="milestone-list">
+        {% for milestone in milestones %}
+        <article class="milestone-item">
+            <div>
+                <h3>{{ milestone.name }}</h3>
+                <p class="muted">{{ milestone.description|default:"No notes added." }}</p>
+                <p class="task-meta">{{ milestone.get_status_display }}{% if milestone.target_date %} · Target {{ milestone.target_date|date:"M j, Y" }}{% endif %}</p>
+            </div>
+            <div class="task-actions">
+                <a href="{% url 'milestone_update' milestone.pk %}">Edit</a>
+                <a href="{% url 'milestone_delete' milestone.pk %}">Delete</a>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state">No milestones yet. Add one to mark a playable build, demo, or release.</p>
+    {% endif %}
+</section>
+{% endblock %}

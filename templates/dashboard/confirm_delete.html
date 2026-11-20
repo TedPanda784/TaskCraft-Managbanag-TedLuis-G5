@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} | TaskCraft{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <p class="eyebrow">CONFIRM CHANGE</p>
+    <h1>{{ page_title }}</h1>
+    <p class="muted">Delete <strong>{{ object }}</strong>? This cannot be undone.</p>
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        <div class="action-row">
+            <button class="button button-danger" type="submit">Delete</button>
+            {% if object.project_id %}
+            <a class="button button-outline" href="{% url 'project_detail' object.project_id %}">Cancel</a>
+            {% elif object.task.project_id %}
+            <a class="button button-outline" href="{% url 'project_detail' object.task.project_id %}">Cancel</a>
+            {% elif object.project.pk %}
+            <a class="button button-outline" href="{% url 'project_detail' object.project.pk %}">Cancel</a>
+            {% else %}
+            <a class="button button-outline" href="{% url 'dashboard' %}">Cancel</a>
+            {% endif %}
+        </div>
+    </form>
+</section>
+{% endblock %}

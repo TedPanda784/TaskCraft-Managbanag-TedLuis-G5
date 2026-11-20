@@ -1,3 +1,6 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import BugDetail, Milestone, Project, ReproductionStep, Task
+
+
+admin.site.register((Project, Task, Milestone, BugDetail, ReproductionStep))

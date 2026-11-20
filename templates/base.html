@@ -5,19 +5,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#11142b">
-    <title>{% block title %}CampusConnect{% endblock %}</title>
+    <meta name="description" content="A lightweight sprint and bug manager for indie game projects.">
+    <title>{% block title %}TaskCraft{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/site.css' %}">
 </head>
 <body>
     <nav class="site-nav">
-    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">✦</span> CampusConnect</a>
+    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">✦</span> TaskCraft</a>
     <div class="nav-links">
     {% if user.is_authenticated %}
     <span class="nav-greeting">Hi, {{ user.username }}!</span>
+    <a class="nav-link" href="{% url 'dashboard' %}">Projects</a>
     <a class="nav-link" href="{% url 'profile' %}">My profile</a>
-    {% if user.is_superuser or user.role == "ADMIN" %}
-        <a class="nav-link" href="{% url 'admin_panel' %}">Admin Panel</a>
-    {% endif %}
+    <a class="button button-small" href="{% url 'project_create' %}">New project</a>
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button class="nav-button" type="submit">Log out</button>

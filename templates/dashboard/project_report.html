@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} progress report | TaskCraft{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+    <div>
+        <p class="eyebrow"><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a> / REPORT</p>
+        <h1>Progress report</h1>
+        <p class="muted">A sprint and bug summary for this project.</p>
+    </div>
+    <a class="button button-outline" href="{% url 'project_detail' project.pk %}">Back to board</a>
+</header>
+
+<section class="stat-grid" aria-label="Project progress">
+    <article class="stat-card stat-card-blue">
+        <p class="stat-label">Total tasks</p>
+        <p class="stat-value">{{ total_tasks }}</p>
+        <p class="stat-note">{{ completed_tasks }} completed</p>
+    </article>
+    <article class="stat-card stat-card-purple">
+        <p class="stat-label">In progress</p>
+        <p class="stat-value">{{ in_progress_tasks }}</p>
+        <p class="stat-note">{{ todo_tasks }} still to do</p>
+    </article>
+    <article class="stat-card stat-card-white">
+        <p class="stat-label">Bug reports</p>
+        <p class="stat-value">{{ bug_count }}</p>
+        <p class="stat-note">{{ milestone_count }} milestones</p>
+    </article>
+</section>
+
+<section class="report-grid">
+    <article class="content-card">
+        <p class="eyebrow">TASK DISTRIBUTION</p>
+        <h2>Progress by logic track</h2>
+        <div class="report-list">
+            {% for track in track_summary %}
+            <div class="report-row">
+                <span>{{ track.name }}</span>
+                <span>{{ track.completed_count }} / {{ track.task_count }} done</span>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+    <article class="content-card">
+        <p class="eyebrow">BUG TRIAGE</p>
+        <h2>Reported bugs by priority</h2>
+        {% if bug_summary %}
+        <div class="report-list">
+            {% for item in bug_summary %}
+            <div class="report-row">
+                <span class="priority-pill priority-{{ item.priority|lower }}">{{ item.priority|title }}</span>
+                <strong>{{ item.total }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No bugs have been logged for this project.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

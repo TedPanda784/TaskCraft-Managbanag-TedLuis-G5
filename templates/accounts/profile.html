@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}My profile | CampusConnect{% endblock %}
+{% block title %}My profile | TaskCraft{% endblock %}
 
 {% block content %}
 <section class="auth-card profile-edit-card">
-  <p class="eyebrow">YOUR ACCOUNT</p>
+  <p class="eyebrow">DEVELOPER PROFILE</p>
   <h1>My profile</h1>
-  <p class="muted">View and update your own CampusConnect details.</p>
+  <p class="muted">Manage the account you use for your game projects.</p>
   <div class="profile-summary">
     <p><span class="detail-label">Username</span>{{ user.username }}</p>
-    <p><span class="detail-label">Role</span>{{ user.get_role_display }}</p>
   </div>
   <form method="post" class="auth-form">
     {% csrf_token %}

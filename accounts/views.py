@@ -5,9 +5,9 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView
 
 from .forms import (
-    CampusConnectAuthenticationForm,
     CustomUserCreationForm,
     ProfileForm,
+    TaskCraftAuthenticationForm,
 )
 
 
@@ -18,8 +18,8 @@ class SignUpView(SuccessMessageMixin, CreateView):
     success_message = "Your account was created. You can now log in."
 
 
-class CampusConnectLoginView(LoginView):
-    form_class = CampusConnectAuthenticationForm
+class TaskCraftLoginView(LoginView):
+    form_class = TaskCraftAuthenticationForm
     template_name = "registration/login.html"
     redirect_authenticated_user = True
 

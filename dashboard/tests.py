@@ -593,3 +593,56 @@ class TaskCraftWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Admin Panel")
+
+    def test_task_cannot_be_assigned_to_another_users_project(self):
+        private_project = Project.objects.create(
+            owner=self.other_user,
+            name="Other user's project",
+        )
+
+        response = self.client.post(
+            reverse("task_create"),
+            {
+                "project": private_project.pk,
+                "logic_track": self.loop_track.pk,
+                "title": "Tampered task",
+                "description": "",
+                "status": Task.Status.TODO,
+                "due_date": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Task.objects.filter(title="Tampered task").exists())
+
+    def test_milestone_cannot_be_assigned_to_another_users_project(self):
+        private_project = Project.objects.create(
+            owner=self.other_user,
+            name="Other user's milestone project",
+        )
+
+        response = self.client.post(
+            reverse("milestone_create"),
+            {
+                "project": private_project.pk,
+                "name": "Tampered milestone",
+                "description": "",
+                "target_date": "",
+                "status": Milestone.Status.UPCOMING,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Milestone.objects.filter(name="Tampered milestone").exists())
+
+    def test_missing_core_record_ids_return_not_found(self):
+        urls = (
+            reverse("project_detail", args=[999999]),
+            reverse("project_update", args=[999999]),
+            reverse("task_update", args=[999999]),
+            reverse("milestone_update", args=[999999]),
+        )
+
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)

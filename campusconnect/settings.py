@@ -26,16 +26,19 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
-    if not DEBUG:
+    if "test" in sys.argv:
+        SECRET_KEY = "test-only-secret-key"
+    elif not DEBUG:
         raise ImproperlyConfigured(
             "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is False."
         )
-    SECRET_KEY = "django-insecure-local-development-only-do-not-use-in-production"
+    else:
+        SECRET_KEY = "django-insecure-local-development-only-do-not-use-in-production"
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -119,11 +122,15 @@ DATABASES = {
     }
 }
 
-# Allows running `python manage.py test` locally without CREATEDB permissions on Supabase
-if "test" in sys.argv and os.environ.get("USE_SQLITE_FOR_TESTS", "False").lower() == "true":
+# Tests use an isolated local database by default; set USE_SQLITE_FOR_TESTS=False
+# only when explicitly testing against PostgreSQL.
+if (
+    "test" in sys.argv
+    and os.environ.get("USE_SQLITE_FOR_TESTS", "True").lower() == "true"
+):
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "test_db.sqlite3",
+        "NAME": ":memory:",
     }
 
 

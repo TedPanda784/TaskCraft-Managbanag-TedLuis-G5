@@ -1,6 +1,10 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+
+from accounts.models import CustomUser
 
 from .models import BugDetail, LogicTrack, Milestone, Project, ReproductionStep, Task
 
@@ -213,6 +217,45 @@ class TaskCraftWorkflowTests(TestCase):
         self.assertRedirects(response, reverse("project_detail", args=[self.project.pk]))
         self.assertFalse(BugDetail.objects.filter(pk=bug.pk).exists())
 
+    def test_bug_update_rolls_back_if_reproduction_steps_cannot_be_saved(self):
+        task = Task.objects.create(
+            project=self.project,
+            logic_track=self.bug_track,
+            title="Bug with existing steps",
+        )
+        bug = BugDetail.objects.create(
+            task=task,
+            priority=BugDetail.Priority.MEDIUM,
+            error_log="Original error",
+        )
+        ReproductionStep.objects.create(
+            bug_detail=bug,
+            number=1,
+            instruction="Original reproduction step",
+        )
+
+        with patch(
+            "dashboard.forms.ReproductionStep.objects.bulk_create",
+            side_effect=RuntimeError("simulated step-save failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    reverse("bug_update", args=[bug.pk]),
+                    {
+                        "priority": BugDetail.Priority.CRITICAL,
+                        "error_log": "Changed error",
+                        "reproduction_steps": "Changed reproduction step",
+                    },
+                )
+
+        bug.refresh_from_db()
+        self.assertEqual(bug.priority, BugDetail.Priority.MEDIUM)
+        self.assertEqual(bug.error_log, "Original error")
+        self.assertEqual(
+            list(bug.reproduction_steps.values_list("instruction", flat=True)),
+            ["Original reproduction step"],
+        )
+
     def test_task_and_milestone_crud(self):
         response = self.client.post(
             reverse("milestone_create"),
@@ -331,3 +374,275 @@ class TaskCraftWorkflowTests(TestCase):
             self.client.post(reverse("task_delete", args=[task.pk])).status_code,
             404,
         )
+
+    def test_project_form_rejects_whitespace_only_name(self):
+        response = self.client.post(
+            reverse("project_create"),
+            {
+                "name": "   ",
+                "description": "",
+                "status": Project.Status.ACTIVE,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Project.objects.filter(owner=self.user, name="   ").exists())
+        self.assertContains(response, "This field is required.")
+
+    def test_core_views_require_login(self):
+        task = Task.objects.create(
+            project=self.project,
+            logic_track=self.bug_track,
+            title="Unauthorized task",
+        )
+        self.client.logout()
+
+        urls = (
+            reverse("dashboard"),
+            reverse("project_detail", args=[self.project.pk]),
+            reverse("project_create"),
+            reverse("project_update", args=[self.project.pk]),
+            reverse("project_delete", args=[self.project.pk]),
+            reverse("project_report", args=[self.project.pk]),
+            reverse("admin_panel"),
+            reverse("task_create"),
+            reverse("task_update", args=[task.pk]),
+            reverse("task_delete", args=[task.pk]),
+            reverse("milestone_create"),
+            reverse("bug_create", args=[task.pk]),
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_user_cannot_view_or_change_another_users_milestone_or_bug(self):
+        milestone = Milestone.objects.create(
+            project=self.project,
+            name="Private milestone",
+        )
+        bug_task = Task.objects.create(
+            project=self.project,
+            logic_track=self.bug_track,
+            title="Private bug",
+        )
+        bug = BugDetail.objects.create(
+            task=bug_task,
+            priority=BugDetail.Priority.HIGH,
+            error_log="Private error",
+        )
+        self.client.force_login(self.other_user)
+
+        for url in (
+            reverse("milestone_update", args=[milestone.pk]),
+            reverse("milestone_delete", args=[milestone.pk]),
+            reverse("bug_update", args=[bug.pk]),
+            reverse("bug_delete", args=[bug.pk]),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+                self.assertEqual(self.client.post(url).status_code, 404)
+
+        self.assertTrue(Milestone.objects.filter(pk=milestone.pk).exists())
+        self.assertTrue(BugDetail.objects.filter(pk=bug.pk).exists())
+
+    def test_delete_requires_confirmation_and_post(self):
+        delete_url = reverse("project_delete", args=[self.project.pk])
+
+        response = self.client.get(delete_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "cannot be undone")
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())
+
+        response = self.client.delete(delete_url)
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())
+
+        response = self.client.post(delete_url, follow=True)
+        self.assertRedirects(response, reverse("dashboard"))
+        self.assertContains(response, "Project deleted successfully.")
+        self.assertFalse(Project.objects.filter(pk=self.project.pk).exists())
+
+    def test_updates_reject_non_post_methods(self):
+        update_url = reverse("project_update", args=[self.project.pk])
+
+        response = self.client.put(
+            update_url,
+            {"name": "Changed without POST", "status": Project.Status.ACTIVE},
+        )
+
+        self.assertEqual(response.status_code, 405)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Pixel Quest")
+
+    def test_project_form_enforces_csrf(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+        csrf_client.get(reverse("project_create"))
+        token = csrf_client.cookies["csrftoken"].value
+        form_data = {
+            "name": "CSRF Protected Project",
+            "description": "",
+            "status": Project.Status.ACTIVE,
+        }
+
+        rejected = csrf_client.post(reverse("project_create"), form_data)
+        self.assertEqual(rejected.status_code, 403)
+        self.assertFalse(
+            Project.objects.filter(name="CSRF Protected Project").exists()
+        )
+
+        accepted = csrf_client.post(
+            reverse("project_create"),
+            form_data,
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(accepted.status_code, 302)
+        self.assertTrue(
+            Project.objects.filter(name="CSRF Protected Project").exists()
+        )
+
+    def test_custom_404_and_500_pages(self):
+        with override_settings(DEBUG=False):
+            not_found = self.client.get("/not-a-real-page/")
+            invalid_id = self.client.get(
+                reverse("project_detail", args=[999999])
+            )
+        self.assertEqual(not_found.status_code, 404)
+        self.assertContains(not_found, "Page not found", status_code=404)
+        self.assertEqual(invalid_id.status_code, 404)
+        self.assertContains(invalid_id, "Page not found", status_code=404)
+
+        self.client.raise_request_exception = False
+        try:
+            with (
+                override_settings(DEBUG=False),
+                patch(
+                    "dashboard.views.DashboardView.get",
+                    side_effect=RuntimeError("test exception"),
+                ),
+            ):
+                server_error = self.client.get(reverse("dashboard"))
+        finally:
+            self.client.raise_request_exception = True
+        self.assertEqual(server_error.status_code, 500)
+        self.assertContains(server_error, "Something went wrong", status_code=500)
+        self.assertNotContains(server_error, "Traceback", status_code=500)
+
+    def test_project_create_shows_success_message(self):
+        response = self.client.post(
+            reverse("project_create"),
+            {
+                "name": "Message Test Project",
+                "description": "",
+                "status": Project.Status.ACTIVE,
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "Project created successfully.")
+
+    def test_role_based_dashboard_shows_admin_overview(self):
+        admin = User.objects.create_user(
+            username="taskcraft-admin",
+            password="test-password",
+            role=CustomUser.Role.ADMIN,
+        )
+        self.client.force_login(admin)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Admin Panel")
+        self.assertContains(response, "Total members")
+        self.assertContains(response, "taskcraft-admin")
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, "YOUR GAME DEV WORKSPACE")
+        self.assertNotContains(response, "Admin Panel")
+
+    def test_admin_panel_enforces_role_in_the_view(self):
+        admin = User.objects.create_user(
+            username="taskcraft-admin",
+            password="test-password",
+            role=CustomUser.Role.ADMIN,
+        )
+
+        response = self.client.get(reverse("admin_panel"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(self.other_user)
+        response = self.client.get(reverse("admin_panel"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(admin)
+        response = self.client.get(reverse("admin_panel"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Admin Panel")
+
+    def test_superuser_can_use_admin_panel_without_admin_role(self):
+        superuser = User.objects.create_superuser(
+            username="site-superuser",
+            email="superuser@example.com",
+            password="test-password",
+        )
+        self.assertEqual(superuser.role, CustomUser.Role.STUDENT)
+        self.client.force_login(superuser)
+
+        response = self.client.get(reverse("admin_panel"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Admin Panel")
+
+    def test_task_cannot_be_assigned_to_another_users_project(self):
+        private_project = Project.objects.create(
+            owner=self.other_user,
+            name="Other user's project",
+        )
+
+        response = self.client.post(
+            reverse("task_create"),
+            {
+                "project": private_project.pk,
+                "logic_track": self.loop_track.pk,
+                "title": "Tampered task",
+                "description": "",
+                "status": Task.Status.TODO,
+                "due_date": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Task.objects.filter(title="Tampered task").exists())
+
+    def test_milestone_cannot_be_assigned_to_another_users_project(self):
+        private_project = Project.objects.create(
+            owner=self.other_user,
+            name="Other user's milestone project",
+        )
+
+        response = self.client.post(
+            reverse("milestone_create"),
+            {
+                "project": private_project.pk,
+                "name": "Tampered milestone",
+                "description": "",
+                "target_date": "",
+                "status": Milestone.Status.UPCOMING,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Milestone.objects.filter(name="Tampered milestone").exists())
+
+    def test_missing_core_record_ids_return_not_found(self):
+        urls = (
+            reverse("project_detail", args=[999999]),
+            reverse("project_update", args=[999999]),
+            reverse("task_update", args=[999999]),
+            reverse("milestone_update", args=[999999]),
+        )
+
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)

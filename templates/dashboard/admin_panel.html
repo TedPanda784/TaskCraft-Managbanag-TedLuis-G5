@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel | TaskCraft{% endblock %}
+
+{% block content %}
+<header class="welcome-card">
+    <p class="eyebrow">TASKCRAFT / ADMINISTRATION</p>
+    <h1>Admin Panel</h1>
+    <p class="muted">Account overview and recent members.</p>
+    {% if user.is_staff %}
+    <a class="button button-outline" href="{% url 'admin:index' %}">Django admin</a>
+    {% endif %}
+</header>
+
+<section class="stat-grid" aria-label="Membership summary">
+    <article class="stat-card stat-card-blue">
+        <p class="stat-label">Total members</p>
+        <p class="stat-value">{{ member_count }}</p>
+    </article>
+    <article class="stat-card stat-card-purple">
+        <p class="stat-label">Students</p>
+        <p class="stat-value">{{ student_count }}</p>
+    </article>
+    <article class="stat-card stat-card-white">
+        <p class="stat-label">Admins</p>
+        <p class="stat-value">{{ admin_count }}</p>
+    </article>
+</section>
+
+<section class="content-card" aria-labelledby="recent-members">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">COMMUNITY</p>
+            <h2 id="recent-members">Recently joined</h2>
+        </div>
+    </div>
+    {% if recent_members %}
+    <div class="table-wrap">
+        <table class="member-table">
+            <thead>
+                <tr>
+                    <th scope="col">Username</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Course</th>
+                    <th scope="col">Joined</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in recent_members %}
+                <tr>
+                    <td>{{ member.username }}</td>
+                    <td>{{ member.email|default:"-" }}</td>
+                    <td>{{ member.get_role_display }}</td>
+                    <td>{{ member.course|default:"-" }}</td>
+                    <td>{{ member.date_joined|date:"M d, Y" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-state">No members have joined yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

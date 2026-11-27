@@ -26,6 +26,7 @@ class AccountFlowTests(TestCase):
                 "email": "NewStudent@example.com",
                 "first_name": "New",
                 "last_name": "Student",
+                "role": CustomUser.Role.ADMIN,
                 "course": "Computing",
                 "phone_number": "555-0123",
                 "password1": "A-different-Strong-Password-938!",
@@ -109,10 +110,19 @@ class AccountFlowTests(TestCase):
     def test_logout_ends_session(self):
         self.client.force_login(self.student)
 
-        response = self.client.post(reverse("logout"))
+        response = self.client.post(reverse("logout"), follow=True)
 
         self.assertRedirects(response, reverse("login"))
+        self.assertContains(response, "You have been logged out.")
         self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_logout_does_not_accept_get(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse("logout"))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertIn("_auth_user_id", self.client.session)
 
     def test_logged_out_user_is_redirected_from_dashboard_and_profile(self):
         for url in (reverse("dashboard"), reverse("profile")):
@@ -173,3 +183,20 @@ class AccountFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "An account with this email already exists.")
+
+    def test_profile_post_cannot_change_account_role(self):
+        self.client.force_login(self.student)
+
+        response = self.client.post(
+            reverse("profile"),
+            {
+                "first_name": self.student.first_name,
+                "last_name": self.student.last_name,
+                "email": self.student.email,
+                "role": CustomUser.Role.ADMIN,
+            },
+        )
+
+        self.assertRedirects(response, reverse("profile"))
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.role, CustomUser.Role.STUDENT)

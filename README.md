@@ -8,6 +8,8 @@ management.
 ## Features
 
 - Private developer accounts with registration, login, logout, and profiles.
+- Role-based student and admin dashboards; the admin member overview is
+  restricted to admin-role accounts and superusers.
 - Project creation and management.
 - A four-track sprint board: Game Loop, UI/UX, State Logic, and Active Bugs.
 - Task search and filtering by logic track and status.
@@ -33,6 +35,7 @@ table is populated with the four built-in tracks by a data migration.
 2. Copy `.env.example` to `.env`. Set a private Django secret key and your
    PostgreSQL connection values. For Supabase, use the direct or session pooler
    connection details from the Supabase dashboard and set `DB_SSLMODE=require`.
+   `DJANGO_DEBUG` defaults to `False`; enable it only for local development.
    Never commit `.env`.
 
 3. Apply migrations and create an account:
@@ -48,12 +51,19 @@ table is populated with the four built-in tracks by a data migration.
    python manage.py runserver 127.0.0.1:8080
    ```
 
-Run tests using the isolated SQLite test settings so the test runner does not
-create a test database on your configured PostgreSQL service:
+Admin-role accounts can open the account overview at
+`http://127.0.0.1:8080/admin-panel/`. The Django administration site remains at
+`http://127.0.0.1:8080/admin/` and requires staff permissions.
+
+Run the full Django test suite with:
 
 ```powershell
-python manage.py test accounts dashboard --settings=campusconnect.test_settings
+python manage.py test
 ```
+
+Tests use an isolated in-memory SQLite database by default and do not touch the
+configured PostgreSQL service. To explicitly run tests against PostgreSQL, set
+`USE_SQLITE_FOR_TESTS=False` in the environment.
 
 ## Data ownership and bug logging
 

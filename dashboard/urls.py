@@ -16,11 +16,13 @@ from .views import (
     TaskCreateView,
     TaskDeleteView,
     TaskUpdateView,
+    AdminPanelView,
 )
 
 
 urlpatterns = [
     path("", DashboardView.as_view(), name="dashboard"),
+    path("admin-panel/", AdminPanelView.as_view(), name="admin_panel"),
     path("projects/new/", ProjectCreateView.as_view(), name="project_create"),
     path("projects/<int:pk>/", ProjectDetailView.as_view(), name="project_detail"),
     path(

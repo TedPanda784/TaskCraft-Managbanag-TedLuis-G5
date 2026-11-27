@@ -3,6 +3,13 @@ from django import forms
 from .models import BugDetail, LogicTrack, Milestone, Project, ReproductionStep, Task
 
 
+def _clean_required_text(value, field_label):
+    value = value.strip()
+    if not value:
+        raise forms.ValidationError(f"{field_label} cannot be blank.")
+    return value
+
+
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
@@ -10,6 +17,9 @@ class ProjectForm(forms.ModelForm):
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
         }
+
+    def clean_name(self):
+        return _clean_required_text(self.cleaned_data["name"], "Project name")
 
 
 class TaskForm(forms.ModelForm):
@@ -40,6 +50,9 @@ class TaskForm(forms.ModelForm):
         self.fields["milestone"].empty_label = "No milestone"
         self.fields["logic_track"].queryset = LogicTrack.objects.all()
 
+    def clean_title(self):
+        return _clean_required_text(self.cleaned_data["title"], "Task title")
+
     def clean(self):
         cleaned_data = super().clean()
         project = cleaned_data.get("project")
@@ -61,6 +74,9 @@ class MilestoneForm(forms.ModelForm):
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["project"].queryset = Project.objects.filter(owner=user)
+
+    def clean_name(self):
+        return _clean_required_text(self.cleaned_data["name"], "Milestone name")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -109,6 +125,9 @@ class BugDetailForm(forms.ModelForm):
         if not steps:
             raise forms.ValidationError("Add at least one reproduction step.")
         return steps
+
+    def clean_error_log(self):
+        return _clean_required_text(self.cleaned_data["error_log"], "Error log")
 
     def save(self, commit=True):
         bug_detail = super().save(commit=False)

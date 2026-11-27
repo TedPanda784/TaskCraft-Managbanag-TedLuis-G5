@@ -1,6 +1,10 @@
 from django.conf import settings
+from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
+
+
+non_whitespace_validator = RegexValidator(r"\S", "This field cannot be blank.")
 
 
 class Project(models.Model):
@@ -13,7 +17,7 @@ class Project(models.Model):
         on_delete=models.CASCADE,
         related_name="game_projects",
     )
-    name = models.CharField(max_length=120)
+    name = models.CharField(max_length=120, validators=[non_whitespace_validator])
     description = models.TextField(blank=True)
     status = models.CharField(
         max_length=10,
@@ -77,7 +81,7 @@ class Milestone(models.Model):
         on_delete=models.CASCADE,
         related_name="milestones",
     )
-    name = models.CharField(max_length=120)
+    name = models.CharField(max_length=120, validators=[non_whitespace_validator])
     description = models.TextField(blank=True)
     target_date = models.DateField(null=True, blank=True)
     status = models.CharField(
@@ -130,7 +134,7 @@ class Task(models.Model):
         null=True,
         blank=True,
     )
-    title = models.CharField(max_length=160)
+    title = models.CharField(max_length=160, validators=[non_whitespace_validator])
     description = models.TextField(blank=True)
     status = models.CharField(
         max_length=12,
@@ -171,7 +175,7 @@ class BugDetail(models.Model):
         related_name="bug_detail",
     )
     priority = models.CharField(max_length=10, choices=Priority.choices)
-    error_log = models.TextField()
+    error_log = models.TextField(validators=[non_whitespace_validator])
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -198,7 +202,7 @@ class ReproductionStep(models.Model):
         related_name="reproduction_steps",
     )
     number = models.PositiveSmallIntegerField()
-    instruction = models.TextField()
+    instruction = models.TextField(validators=[non_whitespace_validator])
 
     class Meta:
         ordering = ("number",)

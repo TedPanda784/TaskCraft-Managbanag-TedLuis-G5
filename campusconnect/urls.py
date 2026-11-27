@@ -22,3 +22,6 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("", include("dashboard.urls")),
 ]
+
+handler404 = "campusconnect.error_views.page_not_found"
+handler500 = "campusconnect.error_views.server_error"

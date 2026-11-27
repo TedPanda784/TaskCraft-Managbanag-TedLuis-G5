@@ -1,4 +1,6 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
@@ -11,15 +13,57 @@ from django.views.generic import (
     UpdateView,
 )
 
+from accounts.models import CustomUser
+
 from .forms import BugDetailForm, MilestoneForm, ProjectForm, TaskForm
 from .models import BugDetail, LogicTrack, Milestone, Project, Task
+
+
+def _admin_dashboard_context():
+    return {
+        "member_count": CustomUser.objects.count(),
+        "student_count": CustomUser.objects.filter(
+            role=CustomUser.Role.STUDENT
+        ).count(),
+        "admin_count": CustomUser.objects.filter(
+            role=CustomUser.Role.ADMIN
+        ).count(),
+        "recent_members": CustomUser.objects.order_by("-date_joined")[:10],
+    }
+
+
+class AdminRoleRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        user = self.request.user
+        return user.is_superuser or user.role == CustomUser.Role.ADMIN
+
+
+class PostOnlyUpdateView(UpdateView):
+    http_method_names = ["get", "post", "head", "options"]
+
+
+class PostOnlyDeleteView(DeleteView):
+    http_method_names = ["get", "post", "head", "options"]
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/home.html"
 
+    def is_admin(self):
+        user = self.request.user
+        return user.is_superuser or user.role == CustomUser.Role.ADMIN
+
+    def get_template_names(self):
+        if self.is_admin():
+            return ["dashboard/admin_panel.html"]
+        return [self.template_name]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        if self.is_admin():
+            context.update(_admin_dashboard_context())
+            return context
+
         user_projects = Project.objects.filter(owner=self.request.user)
         projects = user_projects.annotate(
             task_count=Count("tasks", distinct=True),
@@ -41,6 +85,15 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 task__status__in=(Task.Status.TODO, Task.Status.IN_PROGRESS),
             ).count(),
         )
+        return context
+
+
+class AdminPanelView(AdminRoleRequiredMixin, TemplateView):
+    template_name = "dashboard/admin_panel.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(_admin_dashboard_context())
         return context
 
 
@@ -86,11 +139,12 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class ProjectCreateView(LoginRequiredMixin, CreateView):
+class ProjectCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Project
     form_class = ProjectForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Create a project"}
+    success_message = "Project created successfully."
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -105,21 +159,39 @@ class OwnedProjectMixin:
         return Project.objects.filter(owner=self.request.user)
 
 
-class ProjectUpdateView(LoginRequiredMixin, OwnedProjectMixin, UpdateView):
+class ProjectUpdateView(
+    LoginRequiredMixin, SuccessMessageMixin, OwnedProjectMixin, PostOnlyUpdateView
+):
     model = Project
     form_class = ProjectForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Edit project"}
+    success_message = "Project updated successfully."
 
     def get_success_url(self):
         return reverse("project_detail", kwargs={"pk": self.object.pk})
 
 
-class ProjectDeleteView(LoginRequiredMixin, OwnedProjectMixin, DeleteView):
+class DeleteSuccessMessageMixin:
+    success_message = ""
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, self.success_message)
+        return response
+
+
+class ProjectDeleteView(
+    LoginRequiredMixin,
+    DeleteSuccessMessageMixin,
+    OwnedProjectMixin,
+    PostOnlyDeleteView,
+):
     model = Project
     template_name = "dashboard/confirm_delete.html"
     success_url = reverse_lazy("dashboard")
     extra_context = {"page_title": "Delete project"}
+    success_message = "Project deleted successfully."
 
 
 class UserFormMixin:
@@ -129,11 +201,14 @@ class UserFormMixin:
         return kwargs
 
 
-class TaskCreateView(LoginRequiredMixin, UserFormMixin, CreateView):
+class TaskCreateView(
+    LoginRequiredMixin, UserFormMixin, SuccessMessageMixin, CreateView
+):
     model = Task
     form_class = TaskForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Add a task"}
+    success_message = "Task created successfully."
 
     def get_initial(self):
         initial = super().get_initial()
@@ -153,30 +228,43 @@ class OwnedTaskMixin:
         return Task.objects.filter(project__owner=self.request.user)
 
 
-class TaskUpdateView(LoginRequiredMixin, UserFormMixin, OwnedTaskMixin, UpdateView):
+class TaskUpdateView(
+    LoginRequiredMixin,
+    UserFormMixin,
+    SuccessMessageMixin,
+    OwnedTaskMixin,
+    PostOnlyUpdateView,
+):
     model = Task
     form_class = TaskForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Edit task"}
+    success_message = "Task updated successfully."
 
     def get_success_url(self):
         return reverse("project_detail", kwargs={"pk": self.object.project_id})
 
 
-class TaskDeleteView(LoginRequiredMixin, OwnedTaskMixin, DeleteView):
+class TaskDeleteView(
+    LoginRequiredMixin, DeleteSuccessMessageMixin, OwnedTaskMixin, PostOnlyDeleteView
+):
     model = Task
     template_name = "dashboard/confirm_delete.html"
     extra_context = {"page_title": "Delete task"}
+    success_message = "Task deleted successfully."
 
     def get_success_url(self):
         return reverse("project_detail", kwargs={"pk": self.object.project_id})
 
 
-class MilestoneCreateView(LoginRequiredMixin, UserFormMixin, CreateView):
+class MilestoneCreateView(
+    LoginRequiredMixin, UserFormMixin, SuccessMessageMixin, CreateView
+):
     model = Milestone
     form_class = MilestoneForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Add a milestone"}
+    success_message = "Milestone created successfully."
 
     def get_initial(self):
         initial = super().get_initial()
@@ -197,33 +285,47 @@ class OwnedMilestoneMixin:
 
 
 class MilestoneUpdateView(
-    LoginRequiredMixin, UserFormMixin, OwnedMilestoneMixin, UpdateView
+    LoginRequiredMixin,
+    UserFormMixin,
+    SuccessMessageMixin,
+    OwnedMilestoneMixin,
+    PostOnlyUpdateView,
 ):
     model = Milestone
     form_class = MilestoneForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Edit milestone"}
+    success_message = "Milestone updated successfully."
 
     def get_success_url(self):
         return reverse("project_detail", kwargs={"pk": self.object.project_id})
 
 
-class MilestoneDeleteView(LoginRequiredMixin, OwnedMilestoneMixin, DeleteView):
+class MilestoneDeleteView(
+    LoginRequiredMixin,
+    DeleteSuccessMessageMixin,
+    OwnedMilestoneMixin,
+    PostOnlyDeleteView,
+):
     model = Milestone
     template_name = "dashboard/confirm_delete.html"
     extra_context = {"page_title": "Delete milestone"}
+    success_message = "Milestone deleted successfully."
 
     def get_success_url(self):
         return reverse("project_detail", kwargs={"pk": self.object.project_id})
 
 
-class BugDetailCreateView(LoginRequiredMixin, CreateView):
+class BugDetailCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = BugDetail
     form_class = BugDetailForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Log bug details"}
+    success_message = "Bug details saved successfully."
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         self.task = get_object_or_404(
             Task,
             pk=kwargs["task_pk"],
@@ -256,12 +358,13 @@ class OwnedBugDetailMixin:
 
 
 class BugDetailUpdateView(
-    LoginRequiredMixin, OwnedBugDetailMixin, UpdateView
+    LoginRequiredMixin, SuccessMessageMixin, OwnedBugDetailMixin, PostOnlyUpdateView
 ):
     model = BugDetail
     form_class = BugDetailForm
     template_name = "dashboard/form.html"
     extra_context = {"page_title": "Edit bug details"}
+    success_message = "Bug details updated successfully."
 
     def form_valid(self, form):
         with transaction.atomic():
@@ -271,10 +374,16 @@ class BugDetailUpdateView(
         return reverse("project_detail", kwargs={"pk": self.object.task.project_id})
 
 
-class BugDetailDeleteView(LoginRequiredMixin, OwnedBugDetailMixin, DeleteView):
+class BugDetailDeleteView(
+    LoginRequiredMixin,
+    DeleteSuccessMessageMixin,
+    OwnedBugDetailMixin,
+    PostOnlyDeleteView,
+):
     model = BugDetail
     template_name = "dashboard/confirm_delete.html"
     extra_context = {"page_title": "Delete bug details"}
+    success_message = "Bug details deleted successfully."
 
     def get_success_url(self):
         return reverse("project_detail", kwargs={"pk": self.object.task.project_id})

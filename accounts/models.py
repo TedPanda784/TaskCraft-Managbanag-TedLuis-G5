@@ -24,6 +24,10 @@ class CustomUser(AbstractUser):
 
     class Meta(AbstractUser.Meta):
         constraints = [
+            models.CheckConstraint(
+                condition=Q(role__in=("STUDENT", "ADMIN")),
+                name="custom_user_role_valid",
+            ),
             models.UniqueConstraint(
                 Lower("email"),
                 condition=~Q(email=""),

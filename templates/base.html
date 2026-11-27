@@ -16,6 +16,9 @@
     {% if user.is_authenticated %}
     <span class="nav-greeting">Hi, {{ user.username }}!</span>
     <a class="nav-link" href="{% url 'dashboard' %}">Projects</a>
+    {% if user.is_superuser or user.role == "ADMIN" %}
+    <a class="nav-link" href="{% url 'admin_panel' %}">Admin panel</a>
+    {% endif %}
     <a class="nav-link" href="{% url 'profile' %}">My profile</a>
     <a class="button button-small" href="{% url 'project_create' %}">New project</a>
     <form method="post" action="{% url 'logout' %}">

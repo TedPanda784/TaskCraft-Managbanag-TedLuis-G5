@@ -183,3 +183,20 @@ class AccountFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "An account with this email already exists.")
+
+    def test_profile_post_cannot_change_account_role(self):
+        self.client.force_login(self.student)
+
+        response = self.client.post(
+            reverse("profile"),
+            {
+                "first_name": self.student.first_name,
+                "last_name": self.student.last_name,
+                "email": self.student.email,
+                "role": CustomUser.Role.ADMIN,
+            },
+        )
+
+        self.assertRedirects(response, reverse("profile"))
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.role, CustomUser.Role.STUDENT)
